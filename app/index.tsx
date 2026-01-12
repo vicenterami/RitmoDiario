@@ -96,22 +96,22 @@ export default function Page() {
           data={habits}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <View className="bg-slate-800 p-4 mb-3 rounded-xl border border-slate-700">
+            <TouchableOpacity 
+              onPress={() => router.push(`/habit/${item.id}`)} // <--- ESTA ES LA MAGIA
+              className="bg-slate-800 p-4 mb-3 rounded-xl border border-slate-700 active:bg-slate-700"
+            >
               <View className="flex-row justify-between items-center">
                 <Text className="text-white text-xl font-bold">{item.title}</Text>
+                {/* ... resto del diseño igual ... */}
                 <View className="bg-slate-700 px-2 py-1 rounded">
-                  <Text className="text-xs text-cyan-400 uppercase font-bold">{item.frequency}</Text>
+                   <Text className="text-xs text-cyan-400 uppercase font-bold">{item.frequency}</Text>
                 </View>
               </View>
               
               <Text className="text-slate-400 mt-2">
                 Meta: <Text className="text-white font-bold">{item.targetValue} {item.unit}</Text> diario
               </Text>
-              
-              <Text className="text-slate-500 text-xs mt-3">
-                ID: {item.id} • Tipo: {item.type}
-              </Text>
-            </View>
+            </TouchableOpacity>
           )}
           ListEmptyComponent={
             <View className="mt-10 items-center">

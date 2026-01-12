@@ -1,24 +1,27 @@
 import { Model } from '@nozbe/watermelondb'
 import { field, date, children, writer } from '@nozbe/watermelondb/decorators'
+import { Associations } from '@nozbe/watermelondb/Model' // <--- 1. Importamos esto
 
 export default class Habit extends Model {
   static table = 'habits'
 
-  // Campos simples
+  // 2. Le ponemos el tipo explícito aquí 👇
+  static associations: Associations = {
+    entries: { type: 'has_many', foreignKey: 'habit_id' },
+  }
+
   @field('title') title!: string
-  @field('type') type!: string // 'counter', 'check', etc
+  @field('type') type!: string
   @field('frequency') frequency!: string
   @field('target_value') targetValue!: number
   @field('unit') unit!: string
   @field('status') status!: string
   @date('created_at') createdAt!: Date
 
-  // Relación: Un Hábito tiene muchas Entradas (Logs)
   @children('entries') entries: any
 
-  // Helper para borrar todo
   @writer async deleteHabit() {
-    await this.entries.destroyAllPermanently() // Borra sus logs primero
-    await this.markAsDeleted() // Luego borra el hábito
+    await this.entries.destroyAllPermanently()
+    await this.markAsDeleted()
   }
 }

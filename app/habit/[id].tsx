@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, Alert, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { withObservables } from '@nozbe/watermelondb/react';
 import database from '../../model/index';
 import Habit from '../../model/Habit';
 import Entry from '../../model/Entry';
@@ -10,28 +9,39 @@ export default function HabitDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   
+  // 🛡️ SEGURIDAD: Aseguramos que el ID sea un string limpio
+  const habitId = Array.isArray(id) ? id[0] : id;
+
   const [habit, setHabit] = useState<Habit | null>(null);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [inputAmount, setInputAmount] = useState('');
-  
+  const [loading, setLoading] = useState(true);
+
   // 1. Cargar el Hábito y sus Entradas
   useEffect(() => {
+    if (!habitId) return; // Si no hay ID aún, esperamos
+
     const loadData = async () => {
       try {
+        console.log("🔍 Buscando hábito con ID:", habitId);
+        
         // Buscamos el hábito por ID
-        const habitFound = await database.get<Habit>('habits').find(id as string);
+        const habitFound = await database.get<Habit>('habits').find(habitId);
         setHabit(habitFound);
 
         // Observamos sus entradas (logs) en tiempo real
         const entriesSubscription = habitFound.entries.observe().subscribe(setEntries);
+        
+        setLoading(false);
         return () => entriesSubscription.unsubscribe();
-      } catch (e) {
-        Alert.alert("Error", "No se encontró el hábito");
+      } catch (e: any) {
+        console.error("❌ Error cargando hábito:", e); // <--- ESTO NOS DIRÁ LA VERDAD EN CONSOLA
+        Alert.alert("Error", "No se pudo cargar el hábito: " + e.message);
         router.back();
       }
     };
     loadData();
-  }, [id]);
+  }, [habitId]);
 
   // 2. Calcular Progreso
   const totalProgress = entries.reduce((sum, entry) => sum + entry.amount, 0);
@@ -45,15 +55,14 @@ export default function HabitDetail() {
     try {
       await database.write(async () => {
         await database.get<Entry>('entries').create(entry => {
-          entry.habit.set(habit); // Relacionamos con el hábito actual
+          entry.habit.set(habit); 
           entry.amount = Number(inputAmount);
           entry.date = new Date();
           entry.note = 'Registro manual'; 
         });
       });
-      setInputAmount(''); // Limpiar input
+      setInputAmount(''); 
       
-      // Mensaje de felicitación si completas
       if (totalProgress + Number(inputAmount) >= habit.targetValue) {
         Alert.alert("¡Felicidades! 🎉", "Has cumplido tu meta diaria.");
       }
@@ -66,24 +75,35 @@ export default function HabitDetail() {
   const deleteHabit = async () => {
     Alert.alert(
       "Eliminar Hábito",
-      "¿Estás seguro? Se borrará todo el historial de este hábito.",
+      "¿Estás seguro? Se borrará todo el historial.",
       [
         { text: "Cancelar", style: "cancel" },
         { 
           text: "Eliminar", 
           style: "destructive", 
           onPress: async () => {
-            await database.write(async () => {
-              await habit?.deleteHabit(); // Usamos el método helper que creamos
-            });
-            router.back();
+            try {
+              await database.write(async () => {
+                await habit?.deleteHabit(); 
+              });
+              router.back();
+            } catch (e: any) {
+              Alert.alert("Error al borrar", e.message);
+            }
           }
         }
       ]
     );
   };
 
-  if (!habit) return <View className="flex-1 bg-slate-900 justify-center"><ActivityIndicator /></View>;
+  if (loading || !habit) {
+    return (
+      <View className="flex-1 bg-slate-900 justify-center items-center">
+        <ActivityIndicator size="large" color="#10b981" />
+        <Text className="text-slate-400 mt-4">Cargando hábito...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
@@ -112,7 +132,6 @@ export default function HabitDetail() {
             </Text>
           </View>
           
-          {/* Barra de Progreso */}
           <View className="h-4 bg-slate-900 rounded-full overflow-hidden">
             <View 
               className={`h-full ${isCompleted ? 'bg-emerald-500' : 'bg-blue-500'}`} 
@@ -146,7 +165,7 @@ export default function HabitDetail() {
         {/* Historial */}
         <Text className="text-white font-bold mb-3">Historial Reciente</Text>
         <FlatList
-          data={[...entries].reverse()} // Mostrar más nuevos primero
+          data={[...entries].reverse()} 
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <View className="flex-row justify-between py-3 border-b border-slate-800">
