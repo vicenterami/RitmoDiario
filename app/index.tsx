@@ -1,82 +1,121 @@
 import React, { useState, useEffect } from 'react';
-import { Text, View, TouchableOpacity, FlatList, SafeAreaView, StatusBar } from 'react-native';
+import { Text, View, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert } from 'react-native';
 
-// 1. DESCOMENTAMOS LA DB
+// Importamos la DB y el nuevo Modelo
 import database from '../model/index';
-import Task from '../model/Task';
+import Habit from '../model/Habit';
 
 export default function Page() {
-  // Usamos el tipo Task real, no el Mock
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [error, setError] = useState<string>('');
+  const [habits, setHabits] = useState<Habit[]>([]);
 
-  // 2. Lógica de carga real (Observer)
+  // 1. Cargar Hábitos (Observer en tiempo real)
   useEffect(() => {
-    try {
-      const tasksCollection = database.get<Task>('tasks');
-      const subscription = tasksCollection.query().observe().subscribe(data => {
-        setTasks(data);
-      });
-      return () => subscription.unsubscribe();
-    } catch (e: any) {
-      console.log(e); // Ver error en consola
-      setError('Error DB: ' + e.message);
-    }
+    const habitsCollection = database.get<Habit>('habits');
+    
+    // Observamos la consulta. Si agregas algo, se actualiza solo.
+    const subscription = habitsCollection.query().observe().subscribe(data => {
+      setHabits(data);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // 3. Crear tarea real en DB
-  const addNewTask = async () => {
+  // 2. Crear un Hábito de prueba (Ejemplo: Leer Libro)
+  const createTestHabit = async () => {
     try {
       await database.write(async () => {
-        await database.get<Task>('tasks').create(task => {
-          task.title = 'Tarea ' + Math.floor(Math.random() * 1000);
-          task.isCompleted = false;
+        const habitsCollection = database.get<Habit>('habits');
+        await habitsCollection.create(habit => {
+          habit.title = 'Leer Clean Code';
+          habit.type = 'counter'; // Tipo contador
+          habit.frequency = 'daily';
+          habit.targetValue = 20; // 20 páginas
+          habit.unit = 'pags';
+          habit.status = 'active';
+          habit.createdAt = new Date();
         });
       });
     } catch (e: any) {
-      setError('Error al crear: ' + e.message);
+      Alert.alert("Error", e.message);
+    }
+  };
+
+  // 3. Borrar todo (Para limpiar pruebas)
+  const clearAll = async () => {
+    try {
+      await database.write(async () => {
+        // Obtenemos todos los hábitos y los marcamos para borrar
+        const allHabits = await database.get<Habit>('habits').query().fetch();
+        // WatermelonDB requiere borrar en batch si son muchos, o uno por uno
+        for (const habit of allHabits) {
+          // Usamos el método que creamos en el modelo (si lo pusiste) o destroyPermanently
+          await habit.destroyPermanently(); 
+        }
+      });
+    } catch (e: any) {
+      console.log(e);
     }
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-900">
+    <SafeAreaView className="flex-1 bg-slate-900">
       <StatusBar barStyle="light-content" />
-      <View className="flex-1 p-5 pt-10">
-        <Text className="text-3xl font-bold text-white mb-6 text-center">
-          RitmoDiario 🥁
+      <View className="flex-1 p-5">
+        <Text className="text-3xl font-bold text-white mb-2 text-center">
+          Mis Hábitos 🎯
+        </Text>
+        <Text className="text-slate-400 text-center mb-6">
+          Versión Avanzada (V1)
         </Text>
 
-        {error ? (
-          <View className="bg-red-500 p-3 rounded mb-4">
-            <Text className="text-white font-bold">¡Error de Base de Datos!</Text>
-            <Text className="text-white">{error}</Text>
-          </View>
-        ) : null}
+        {/* Botonera de Acciones */}
+        <View className="flex-row justify-between mb-6 gap-2">
+          <TouchableOpacity 
+            onPress={createTestHabit}
+            className="flex-1 bg-emerald-600 p-4 rounded-xl active:bg-emerald-700"
+          >
+            <Text className="text-white text-center font-bold">
+              + Crear Hábito
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          onPress={addNewTask}
-          className="bg-blue-600 p-4 rounded-xl mb-6 active:bg-blue-700"
-        >
-          <Text className="text-white text-center font-bold text-lg">
-            + Nueva Tarea (DB Real)
-          </Text>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={clearAll}
+            className="bg-red-900/50 p-4 rounded-xl active:bg-red-800"
+          >
+            <Text className="text-red-300 font-bold">
+              Borrar Todo
+            </Text>
+          </TouchableOpacity>
+        </View>
 
+        {/* Lista de Hábitos */}
         <FlatList
-          data={tasks}
+          data={habits}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <View className="bg-gray-800 p-4 mb-3 rounded-lg border border-gray-700">
-              <Text className="text-white text-lg font-semibold">{item.title}</Text>
-              <Text className="text-gray-400 text-sm">
-                ID: {item.id}
+            <View className="bg-slate-800 p-4 mb-3 rounded-xl border border-slate-700">
+              <View className="flex-row justify-between items-center">
+                <Text className="text-white text-xl font-bold">{item.title}</Text>
+                <View className="bg-slate-700 px-2 py-1 rounded">
+                  <Text className="text-xs text-cyan-400 uppercase font-bold">{item.frequency}</Text>
+                </View>
+              </View>
+              
+              <Text className="text-slate-400 mt-2">
+                Meta: <Text className="text-white font-bold">{item.targetValue} {item.unit}</Text> diario
+              </Text>
+              
+              <Text className="text-slate-500 text-xs mt-3">
+                ID: {item.id} • Tipo: {item.type}
               </Text>
             </View>
           )}
           ListEmptyComponent={
-            <Text className="text-gray-500 text-center mt-10">
-              Presiona el botón para guardar en WatermelonDB.
-            </Text>
+            <View className="mt-10 items-center">
+              <Text className="text-slate-500 text-lg">No hay hábitos aún.</Text>
+              <Text className="text-slate-600 text-sm mt-2">Crea uno para empezar a trackear.</Text>
+            </View>
           }
         />
       </View>
