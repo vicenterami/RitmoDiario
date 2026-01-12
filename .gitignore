@@ -44,3 +44,5 @@ env.d.ts
 # IDEs
 .idea/
 *.iml
+
+*.txt

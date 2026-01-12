@@ -7,15 +7,14 @@ import Habit from '../model/Habit';
 export default function CreateHabit() {
   const router = useRouter();
   
-  // Estados locales para el formulario
   const [title, setTitle] = useState('');
-  const [type, setType] = useState('counter'); // counter, check, currency
-  const [target, setTarget] = useState('');
+  const [dailyTarget, setDailyTarget] = useState(''); // Meta Diaria
+  const [totalGoal, setTotalGoal] = useState('');     // Meta Final (Opcional)
   const [unit, setUnit] = useState('');
 
   const saveHabit = async () => {
-    if (!title || !target) {
-      Alert.alert('Faltan datos', 'Por favor pon un título y una meta.');
+    if (!title || !dailyTarget) {
+      Alert.alert('Faltan datos', 'El título y la meta diaria son obligatorios.');
       return;
     }
 
@@ -23,15 +22,16 @@ export default function CreateHabit() {
       await database.write(async () => {
         await database.get<Habit>('habits').create(habit => {
           habit.title = title;
-          habit.type = type; // Por ahora manual, luego haremos selectores bonitos
+          habit.type = 'counter';
           habit.frequency = 'daily';
-          habit.targetValue = Number(target);
-          habit.unit = unit || 'uni';
+          habit.targetValue = Number(dailyTarget);
+          // Si el usuario puso meta final, la guardamos, si no, es 0
+          habit.totalGoal = totalGoal ? Number(totalGoal) : 0; 
+          habit.unit = unit || 'veces';
           habit.status = 'active';
           habit.createdAt = new Date();
         });
       });
-      // Volver atrás al guardar
       router.back();
     } catch (e: any) {
       Alert.alert('Error', e.message);
@@ -43,9 +43,8 @@ export default function CreateHabit() {
       <ScrollView className="p-5">
         <Text className="text-white text-2xl font-bold mb-6">Nuevo Desafío 🚀</Text>
 
-        {/* Input Título */}
-        <View className="mb-4">
-          <Text className="text-slate-400 mb-2">Nombre del Hábito</Text>
+        <View className="mb-6">
+          <Text className="text-slate-400 mb-2 font-bold">1. ¿Qué quieres lograr?</Text>
           <TextInput
             className="bg-slate-800 text-white p-4 rounded-xl border border-slate-700 text-lg"
             placeholder="Ej: Leer Clean Code"
@@ -55,24 +54,20 @@ export default function CreateHabit() {
           />
         </View>
 
-        {/* Input Meta Numérica */}
-        <View className="flex-row gap-4 mb-4">
-          <View className="flex-1">
-            <Text className="text-slate-400 mb-2">Meta Diaria</Text>
+        <View className="mb-6">
+          <Text className="text-slate-400 mb-2 font-bold">2. Meta Diaria (Reinicio cada día)</Text>
+          <View className="flex-row gap-4">
             <TextInput
-              className="bg-slate-800 text-white p-4 rounded-xl border border-slate-700 text-lg"
+              className="flex-1 bg-slate-800 text-white p-4 rounded-xl border border-slate-700 text-lg"
               placeholder="Ej: 20"
-              placeholderTextColor="#64748b"
               keyboardType="numeric"
-              value={target}
-              onChangeText={setTarget}
+              placeholderTextColor="#64748b"
+              value={dailyTarget}
+              onChangeText={setDailyTarget}
             />
-          </View>
-          <View className="flex-1">
-            <Text className="text-slate-400 mb-2">Unidad</Text>
             <TextInput
-              className="bg-slate-800 text-white p-4 rounded-xl border border-slate-700 text-lg"
-              placeholder="pags, min, kg"
+              className="flex-1 bg-slate-800 text-white p-4 rounded-xl border border-slate-700 text-lg"
+              placeholder="Unidad (págs)"
               placeholderTextColor="#64748b"
               value={unit}
               onChangeText={setUnit}
@@ -80,28 +75,23 @@ export default function CreateHabit() {
           </View>
         </View>
 
-        {/* Selector de Tipo (Simplificado visualmente por ahora) */}
-        <Text className="text-slate-400 mb-2">Tipo de seguimiento</Text>
-        <View className="flex-row gap-2 mb-8">
-          {['counter', 'check', 'currency'].map((t) => (
-            <TouchableOpacity
-              key={t}
-              onPress={() => setType(t)}
-              className={`p-3 rounded-lg border ${type === t ? 'bg-blue-600 border-blue-500' : 'bg-slate-800 border-slate-700'}`}
-            >
-              <Text className="text-white capitalize">{t}</Text>
-            </TouchableOpacity>
-          ))}
+        <View className="mb-8">
+          <Text className="text-emerald-400 mb-2 font-bold">3. Meta Final (Opcional)</Text>
+          <Text className="text-slate-500 text-xs mb-2">
+            ¿Quieres completar un total a largo plazo? (Ej: El libro tiene 400 páginas)
+          </Text>
+          <TextInput
+            className="bg-slate-800 text-white p-4 rounded-xl border border-slate-700 text-lg"
+            placeholder="Ej: 400"
+            keyboardType="numeric"
+            placeholderTextColor="#64748b"
+            value={totalGoal}
+            onChangeText={setTotalGoal}
+          />
         </View>
 
-        {/* Botón Guardar */}
-        <TouchableOpacity
-          onPress={saveHabit}
-          className="bg-emerald-500 p-4 rounded-xl active:bg-emerald-600"
-        >
-          <Text className="text-slate-900 font-bold text-center text-lg">
-            Crear Hábito
-          </Text>
+        <TouchableOpacity onPress={saveHabit} className="bg-emerald-500 p-4 rounded-xl active:bg-emerald-600 shadow-lg shadow-emerald-500/20">
+          <Text className="text-slate-900 font-bold text-center text-lg">Crear Hábito</Text>
         </TouchableOpacity>
 
       </ScrollView>

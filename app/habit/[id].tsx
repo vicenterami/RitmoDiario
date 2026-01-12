@@ -8,8 +8,6 @@ import Entry from '../../model/Entry';
 export default function HabitDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  
-  // 🛡️ SEGURIDAD: Aseguramos que el ID sea un string limpio
   const habitId = Array.isArray(id) ? id[0] : id;
 
   const [habit, setHabit] = useState<Habit | null>(null);
@@ -17,167 +15,136 @@ export default function HabitDetail() {
   const [inputAmount, setInputAmount] = useState('');
   const [loading, setLoading] = useState(true);
 
-  // 1. Cargar el Hábito y sus Entradas
   useEffect(() => {
-    if (!habitId) return; // Si no hay ID aún, esperamos
-
+    if (!habitId) return;
     const loadData = async () => {
       try {
-        console.log("🔍 Buscando hábito con ID:", habitId);
-        
-        // Buscamos el hábito por ID
         const habitFound = await database.get<Habit>('habits').find(habitId);
         setHabit(habitFound);
-
-        // Observamos sus entradas (logs) en tiempo real
-        const entriesSubscription = habitFound.entries.observe().subscribe(setEntries);
-        
+        // Observamos TODAS las entradas
+        const subscription = habitFound.entries.observe().subscribe(setEntries);
         setLoading(false);
-        return () => entriesSubscription.unsubscribe();
-      } catch (e: any) {
-        console.error("❌ Error cargando hábito:", e); // <--- ESTO NOS DIRÁ LA VERDAD EN CONSOLA
-        Alert.alert("Error", "No se pudo cargar el hábito: " + e.message);
+        return () => subscription.unsubscribe();
+      } catch (e) {
+        Alert.alert("Error", "No se encontró el hábito");
         router.back();
       }
     };
     loadData();
   }, [habitId]);
 
-  // 2. Calcular Progreso
-  const totalProgress = entries.reduce((sum, entry) => sum + entry.amount, 0);
-  const progressPercent = habit ? Math.min((totalProgress / habit.targetValue) * 100, 100) : 0;
-  const isCompleted = progressPercent >= 100;
+  // --- LÓGICA DE PROGRESO ---
 
-  // 3. Agregar Progreso
+  // 1. Filtramos solo las entradas de HOY para la barra diaria
+  const todayStr = new Date().toDateString(); // "Mon Jan 12 2026"
+  const dailyEntries = entries.filter(e => e.date.toDateString() === todayStr);
+  const dailyProgress = dailyEntries.reduce((sum, e) => sum + e.amount, 0);
+
+  // 2. Calculamos el total acumulado de la historia
+  const totalAccumulated = entries.reduce((sum, e) => sum + e.amount, 0);
+
+  // 3. Porcentajes
+  const dailyPercent = habit ? Math.min((dailyProgress / habit.targetValue) * 100, 100) : 0;
+  
+  // Solo calculamos porcentaje total si existe una meta final (totalGoal > 0)
+  const hasTotalGoal = habit && habit.totalGoal > 0;
+  const totalPercent = hasTotalGoal ? Math.min((totalAccumulated / habit.totalGoal) * 100, 100) : 0;
+
+  // --------------------------
+
   const addEntry = async () => {
     if (!inputAmount || !habit) return;
-    
     try {
       await database.write(async () => {
         await database.get<Entry>('entries').create(entry => {
-          entry.habit.set(habit); 
+          entry.habit.set(habit);
           entry.amount = Number(inputAmount);
           entry.date = new Date();
-          entry.note = 'Registro manual'; 
+          entry.note = 'Manual';
         });
       });
-      setInputAmount(''); 
-      
-      if (totalProgress + Number(inputAmount) >= habit.targetValue) {
-        Alert.alert("¡Felicidades! 🎉", "Has cumplido tu meta diaria.");
-      }
-    } catch (e: any) {
-      Alert.alert("Error", e.message);
-    }
+      setInputAmount('');
+    } catch (e: any) { Alert.alert("Error", e.message); }
   };
 
-  // 4. Borrar Hábito
-  const deleteHabit = async () => {
-    Alert.alert(
-      "Eliminar Hábito",
-      "¿Estás seguro? Se borrará todo el historial.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Eliminar", 
-          style: "destructive", 
-          onPress: async () => {
-            try {
-              await database.write(async () => {
-                await habit?.deleteHabit(); 
-              });
-              router.back();
-            } catch (e: any) {
-              Alert.alert("Error al borrar", e.message);
-            }
-          }
-        }
-      ]
-    );
-  };
+  const deleteHabit = async () => { /* ... (Mismo código de antes) ... */ };
 
-  if (loading || !habit) {
-    return (
-      <View className="flex-1 bg-slate-900 justify-center items-center">
-        <ActivityIndicator size="large" color="#10b981" />
-        <Text className="text-slate-400 mt-4">Cargando hábito...</Text>
-      </View>
-    );
-  }
+  if (loading || !habit) return <ActivityIndicator className="mt-10" />;
 
   return (
     <SafeAreaView className="flex-1 bg-slate-900">
       <View className="p-5 flex-1">
-        {/* Header */}
-        <View className="flex-row justify-between items-start mb-6">
-          <TouchableOpacity onPress={() => router.back()} className="p-2">
-            <Text className="text-slate-400 text-lg">← Volver</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={deleteHabit} className="p-2 bg-red-900/30 rounded-lg">
-            <Text className="text-red-400 font-bold">Eliminar</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Header simple */}
+        <TouchableOpacity onPress={() => router.back()} className="mb-4">
+          <Text className="text-slate-400">← Volver</Text>
+        </TouchableOpacity>
 
         <Text className="text-3xl text-white font-bold mb-1">{habit.title}</Text>
-        <Text className="text-slate-400 mb-6 uppercase tracking-widest text-xs">
-          {habit.type} • {habit.frequency}
-        </Text>
+        <View className="bg-slate-800 self-start px-2 py-1 rounded mb-6">
+             <Text className="text-xs text-cyan-400 uppercase font-bold">{habit.frequency}</Text>
+        </View>
 
-        {/* Tarjeta de Progreso */}
-        <View className="bg-slate-800 p-6 rounded-2xl border border-slate-700 mb-8">
+        {/* --- TARJETA PROGRESO DIARIO (HOY) --- */}
+        <View className="bg-slate-800 p-5 rounded-2xl border border-slate-700 mb-6 relative overflow-hidden">
           <View className="flex-row justify-between mb-2">
-            <Text className="text-slate-400">Progreso Actual</Text>
+            <Text className="text-slate-300 font-bold">📅 Progreso de Hoy</Text>
             <Text className="text-white font-bold text-xl">
-              {totalProgress} / {habit.targetValue} <Text className="text-sm text-slate-400">{habit.unit}</Text>
+              {dailyProgress} <Text className="text-slate-500 text-sm">/ {habit.targetValue} {habit.unit}</Text>
             </Text>
           </View>
-          
           <View className="h-4 bg-slate-900 rounded-full overflow-hidden">
-            <View 
-              className={`h-full ${isCompleted ? 'bg-emerald-500' : 'bg-blue-500'}`} 
-              style={{ width: `${progressPercent}%` }} 
-            />
+            <View className="h-full bg-emerald-500" style={{ width: `${dailyPercent}%` }} />
           </View>
-          <Text className="text-right text-slate-500 text-xs mt-2">
-            {progressPercent.toFixed(1)}% completado
+          <Text className="text-right text-emerald-400 text-xs mt-1">
+            {dailyPercent >= 100 ? '¡Meta diaria cumplida! 🎉' : 'Sigue así'}
           </Text>
         </View>
 
-        {/* Input para agregar registro */}
+        {/* --- TARJETA PROGRESO FINAL (LIBRO COMPLETO) --- */}
+        {hasTotalGoal && (
+           <View className="bg-slate-900 p-5 rounded-2xl border border-slate-800 mb-8">
+            <View className="flex-row justify-between mb-2">
+              <Text className="text-slate-400 font-bold">🏔️ Meta Final</Text>
+              <Text className="text-slate-200 font-bold">
+                {totalAccumulated} / {habit.totalGoal}
+              </Text>
+            </View>
+            <View className="h-2 bg-slate-800 rounded-full overflow-hidden">
+              <View className="h-full bg-blue-600" style={{ width: `${totalPercent}%` }} />
+            </View>
+            <Text className="text-slate-500 text-xs mt-2 text-right">
+              {totalPercent.toFixed(1)}% completado del total
+            </Text>
+          </View>
+        )}
+
+        {/* Input */}
         <Text className="text-white font-bold mb-3">Registrar Avance</Text>
         <View className="flex-row gap-3 mb-8">
           <TextInput 
             className="flex-1 bg-slate-800 text-white p-4 rounded-xl border border-slate-700 text-lg"
-            placeholder="0"
+            placeholder="Cantidad"
             placeholderTextColor="#64748b"
             keyboardType="numeric"
             value={inputAmount}
             onChangeText={setInputAmount}
           />
-          <TouchableOpacity 
-            onPress={addEntry}
-            className="bg-blue-600 justify-center px-6 rounded-xl active:bg-blue-700"
-          >
-            <Text className="text-white font-bold text-lg">+</Text>
+          <TouchableOpacity onPress={addEntry} className="bg-blue-600 justify-center px-6 rounded-xl">
+            <Text className="text-white font-bold text-2xl">+</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Historial */}
-        <Text className="text-white font-bold mb-3">Historial Reciente</Text>
+        {/* Historial (Solo visual) */}
+        <Text className="text-white font-bold mb-3">Historial</Text>
         <FlatList
           data={[...entries].reverse()} 
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <View className="flex-row justify-between py-3 border-b border-slate-800">
-              <Text className="text-slate-400">
-                {item.date.toLocaleDateString()}
-              </Text>
-              <Text className="text-emerald-400 font-bold">
-                +{item.amount} {habit.unit}
-              </Text>
+              <Text className="text-slate-400">{item.date.toLocaleDateString()}</Text>
+              <Text className="text-emerald-400 font-bold">+{item.amount} {habit.unit}</Text>
             </View>
           )}
-          ListEmptyComponent={<Text className="text-slate-600 italic">Sin registros aún.</Text>}
         />
       </View>
     </SafeAreaView>

@@ -4,8 +4,6 @@ import { Associations } from '@nozbe/watermelondb/Model' // <--- 1. Importamos e
 
 export default class Habit extends Model {
   static table = 'habits'
-
-  // 2. Le ponemos el tipo explícito aquí 👇
   static associations: Associations = {
     entries: { type: 'has_many', foreignKey: 'habit_id' },
   }
@@ -14,6 +12,7 @@ export default class Habit extends Model {
   @field('type') type!: string
   @field('frequency') frequency!: string
   @field('target_value') targetValue!: number
+  @field('total_goal') totalGoal!: number
   @field('unit') unit!: string
   @field('status') status!: string
   @date('created_at') createdAt!: Date
