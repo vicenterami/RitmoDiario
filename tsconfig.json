@@ -2,8 +2,10 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "experimentalDecorators": true,
+    "experimentalDecorators": true, 
     "emitDecoratorMetadata": true,
-    "jsxImportSource": "nativewind"
+    "paths": {
+      "@/*": ["./*"]
+    }
   }
 }

@@ -40,3 +40,7 @@ env.d.ts
 # generated native folders
 /ios
 /android
+
+# IDEs
+.idea/
+*.iml

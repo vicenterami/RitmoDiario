@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Text, View, TouchableOpacity, FlatList, SafeAreaView, StatusBar } from 'react-native';
-import './global.css';
 
-// Importamos la base de datos y el modelo
-import database from './model/index';
-import Task from './model/Task';
+// 1. DESCOMENTAMOS LA DB
+import database from '../model/index';
+import Task from '../model/Task';
 
-export default function App() {
+export default function Page() {
+  // Usamos el tipo Task real, no el Mock
   const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string>('');
 
-  // 1. Cargar tareas al iniciar
+  // 2. Lógica de carga real (Observer)
   useEffect(() => {
     try {
       const tasksCollection = database.get<Task>('tasks');
@@ -19,11 +19,12 @@ export default function App() {
       });
       return () => subscription.unsubscribe();
     } catch (e: any) {
+      console.log(e); // Ver error en consola
       setError('Error DB: ' + e.message);
     }
   }, []);
 
-  // 2. Crear tarea nueva
+  // 3. Crear tarea real en DB
   const addNewTask = async () => {
     try {
       await database.write(async () => {
@@ -47,7 +48,7 @@ export default function App() {
 
         {error ? (
           <View className="bg-red-500 p-3 rounded mb-4">
-            <Text className="text-white font-bold">¡Error!</Text>
+            <Text className="text-white font-bold">¡Error de Base de Datos!</Text>
             <Text className="text-white">{error}</Text>
           </View>
         ) : null}
@@ -57,7 +58,7 @@ export default function App() {
           className="bg-blue-600 p-4 rounded-xl mb-6 active:bg-blue-700"
         >
           <Text className="text-white text-center font-bold text-lg">
-            + Nueva Tarea
+            + Nueva Tarea (DB Real)
           </Text>
         </TouchableOpacity>
 
@@ -74,7 +75,7 @@ export default function App() {
           )}
           ListEmptyComponent={
             <Text className="text-gray-500 text-center mt-10">
-              Presiona el botón azul para crear tu primera tarea.
+              Presiona el botón para guardar en WatermelonDB.
             </Text>
           }
         />
