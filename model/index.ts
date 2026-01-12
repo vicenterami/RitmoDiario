@@ -1,27 +1,25 @@
-import { Platform } from 'react-native';
-import { Database } from '@nozbe/watermelondb';
-import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
+import { Database } from '@nozbe/watermelondb'
+import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite'
 
-import schema from './schema'; // Asegurate que sea 'schema' o 'Schema' segun tu archivo
-import migrations from './migrations';
-import Task from './Task'; // Tu modelo
+import schema from './schema'
+import Habit from './Habit'
+import Entry from './Entry'
+// Importa Category si creaste el modelo, sino déjalo pendiente
 
 const adapter = new SQLiteAdapter({
   schema,
-  migrations,
-  // ⚠️ ESTA ES LA CLAVE: Desactiva JSI para que funcione en Expo Go
-  jsi: false, 
-  
-  onSetUpError: error => {
-    console.log("Error cargando DB:", error);
-  }
-});
+  // (opcional) migrations, // Lo veremos cuando lances la v2
+  jsi: true, 
+  onSetUpError: error => { console.log(error) }
+})
 
 const database = new Database({
   adapter,
   modelClasses: [
-    Task,
+    Habit,
+    Entry,
+    // Category
   ],
-});
+})
 
-export default database;
+export default database
