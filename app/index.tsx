@@ -4,8 +4,10 @@ import { Text, View, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert 
 // Importamos la DB y el nuevo Modelo
 import database from '../model/index';
 import Habit from '../model/Habit';
+import { useRouter } from 'expo-router';
 
 export default function Page() {
+  const router = useRouter();
   const [habits, setHabits] = useState<Habit[]>([]);
 
   // 1. Cargar Hábitos (Observer en tiempo real)
@@ -71,13 +73,13 @@ export default function Page() {
         {/* Botonera de Acciones */}
         <View className="flex-row justify-between mb-6 gap-2">
           <TouchableOpacity 
-            onPress={createTestHabit}
+            onPress={() => router.push('/create')}
             className="flex-1 bg-emerald-600 p-4 rounded-xl active:bg-emerald-700"
-          >
-            <Text className="text-white text-center font-bold">
-              + Crear Hábito
-            </Text>
-          </TouchableOpacity>
+            >
+              <Text className="text-white text-center font-bold">
+                + Nuevo Hábito
+              </Text>
+            </TouchableOpacity>
 
           <TouchableOpacity 
             onPress={clearAll}
