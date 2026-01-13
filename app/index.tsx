@@ -1,25 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { Text, View, TouchableOpacity, FlatList, SafeAreaView, StatusBar, Alert } from 'react-native';
-
-// Importamos la DB y el nuevo Modelo
 import database from '../model/index';
 import Habit from '../model/Habit';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import HabitCard from './components/HabitCard';
 
 export default function Page() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const { action, targetId } = params;
   const [habits, setHabits] = useState<Habit[]>([]);
 
-  // 1. Cargar Hábitos (Observer en tiempo real)
+  // 1. Manejo de borrado delegado
   useEffect(() => {
-    const habitsCollection = database.get<Habit>('habits');
-    
-    // Observamos la consulta. Si agregas algo, se actualiza solo.
-    const subscription = habitsCollection.query().observe().subscribe(data => {
-      setHabits(data);
-    });
+    // Si no hay orden de borrar, no hacemos nada
+    if (action === 'delete_habit' && targetId) {
+      const performDelete = async () => {
+        try {
+            const id = Array.isArray(targetId) ? targetId[0] : targetId;
+            await database.write(async () => {
+                const habit = await database.get<Habit>('habits').find(id);
+                await habit.deleteHabit(); // Usamos el método del modelo
+            });
+        } catch(e) { console.log("Error borrando:", e); } 
+        finally { router.setParams({ action: '', targetId: '' }); }
+      };
+      // Pequeño delay técnico necesario
+      setTimeout(performDelete, 500);
+    }
+  }, [action, targetId]);
 
-    return () => subscription.unsubscribe();
+
+  // Cargar Hábitos (Observer en tiempo real)
+  useEffect(() => {
+      const subscription = database.get<Habit>('habits').query().observe().subscribe(setHabits);
+      return () => subscription.unsubscribe();
   }, []);
 
   // 2. Crear un Hábito de prueba (Ejemplo: Leer Libro)
@@ -80,7 +95,6 @@ export default function Page() {
                 + Nuevo Hábito
               </Text>
             </TouchableOpacity>
-
           <TouchableOpacity 
             onPress={clearAll}
             className="bg-red-900/50 p-4 rounded-xl active:bg-red-800"
@@ -96,22 +110,10 @@ export default function Page() {
           data={habits}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
-            <TouchableOpacity 
-              onPress={() => router.push(`/habit/${item.id}`)} // <--- ESTA ES LA MAGIA
-              className="bg-slate-800 p-4 mb-3 rounded-xl border border-slate-700 active:bg-slate-700"
-            >
-              <View className="flex-row justify-between items-center">
-                <Text className="text-white text-xl font-bold">{item.title}</Text>
-                {/* ... resto del diseño igual ... */}
-                <View className="bg-slate-700 px-2 py-1 rounded">
-                   <Text className="text-xs text-cyan-400 uppercase font-bold">{item.frequency}</Text>
-                </View>
-              </View>
-              
-              <Text className="text-slate-400 mt-2">
-                Meta: <Text className="text-white font-bold">{item.targetValue} {item.unit}</Text> diario
-              </Text>
-            </TouchableOpacity>
+            <HabitCard 
+                habit={item} 
+                onPress={() => router.push(`/habit/${item.id}`)} 
+            />
           )}
           ListEmptyComponent={
             <View className="mt-10 items-center">
