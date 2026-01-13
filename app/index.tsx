@@ -13,19 +13,22 @@ export default function Page() {
 
   // 1. Manejo de borrado delegado
   useEffect(() => {
-    // Si no hay orden de borrar, no hacemos nada
     if (action === 'delete_habit' && targetId) {
       const performDelete = async () => {
         try {
             const id = Array.isArray(targetId) ? targetId[0] : targetId;
-            await database.write(async () => {
-                const habit = await database.get<Habit>('habits').find(id);
-                await habit.deleteHabit(); // Usamos el método del modelo
-            });
-        } catch(e) { console.log("Error borrando:", e); } 
-        finally { router.setParams({ action: '', targetId: '' }); }
+                        
+            // ✅ AHORA (BIEN): Buscamos y ejecutamos directo.
+            // WatermelonDB maneja la transacción dentro del modelo gracias a @writer
+            const habit = await database.get<Habit>('habits').find(id);
+            await habit.deleteHabit(); 
+            
+        } catch(e) { 
+            console.log("Error borrando:", e); 
+        } finally { 
+            router.setParams({ action: '', targetId: '' }); 
+        }
       };
-      // Pequeño delay técnico necesario
       setTimeout(performDelete, 500);
     }
   }, [action, targetId]);

@@ -1,13 +1,12 @@
 import { Model } from '@nozbe/watermelondb';
 import { field, date, text, children, writer } from '@nozbe/watermelondb/decorators';
-import { Associations } from '@nozbe/watermelondb/Model'; // Importamos tipos
-// ⚠️ IMPORTANTE: Usamos 'import type' para romper el ciclo de dependencias
+import { Associations } from '@nozbe/watermelondb/Model';
+// ⚠️ IMPORTANTE: Usamos 'import type' para evitar el ciclo "El huevo y la gallina"
 import type Entry from './Entry'; 
 
 export default class Habit extends Model {
   static table = 'habits';
 
-  // 1. AÑADIR ESTO: Definir la asociación también aquí
   static associations: Associations = {
     entries: { type: 'has_many', foreignKey: 'habit_id' },
   };
@@ -16,26 +15,47 @@ export default class Habit extends Model {
   @text('type') type!: string;
   @text('frequency') frequency!: 'daily' | 'weekly';
   @field('target_value') targetValue!: number;
-  @field('total_goal') totalGoal!: number;
+  @field('total_goal') totalGoal!: number; // Meta Global (ej: 300)
   @text('unit') unit!: string;
   @text('status') status!: string;
   @date('created_at') createdAt!: Date;
 
-  // 2. Decorador Children (apunta a la tabla 'entries')
   @children('entries') entries!: any; 
 
-  // --- LÓGICA DE NEGOCIO ---
-  
-  // Aquí usamos 'Entry[]' solo como tipo, gracias al 'import type' de arriba
-  getProgress(entriesList: Entry[]) {
-    // ... (Tu misma lógica de antes) ...
-    const today = new Date();
-    // ...
-    // Solo asegurate de importar la función getStartOfWeek si la usas
-    return entriesList.reduce((sum, e) => sum + e.amount, 0); // (Resumido para el ejemplo)
+  // --- LÓGICA DE PROGRESO ---
+
+  // 1. Progreso TOTAL (Suma histórica para la Meta Final)
+  getTotalProgress(entriesList: Entry[]) {
+    return entriesList.reduce((sum, e) => sum + e.amount, 0);
   }
 
+  // 2. Progreso ACTUAL (Diario o Semanal para la barra principal)
+  getCurrentProgress(entriesList: Entry[]) {
+    const now = new Date();
+    
+    // Calcular inicio del periodo (Día o Semana)
+    let startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+
+    if (this.frequency === 'weekly') {
+      const day = startDate.getDay();
+      const diff = startDate.getDate() - day + (day === 0 ? -6 : 1); // Ajuste al Lunes
+      startDate.setDate(diff);
+    }
+
+    // Filtramos solo las entradas desde esa fecha
+    return entriesList
+      .filter(e => e.date >= startDate)
+      .reduce((sum, e) => sum + e.amount, 0);
+  }
+
+  // --- ACCIONES ---
+
+  // El decorador @writer YA INICIA la transacción. 
+  // NO llamar dentro de otro database.write
   @writer async deleteHabit() {
+     // Borramos primero los hijos para evitar registros huérfanos (opcional pero recomendado)
+     await this.entries.destroyAllPermanently(); 
      await this.destroyPermanently();
   }
 }
